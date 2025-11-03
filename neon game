@@ -1,0 +1,659 @@
+<<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Neon Game</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#070517;
+    --panel:#071026;
+    --neon-cyan: #00f0ff;
+    --neon-magenta: #ff00d0;
+    --neon-green: #7cff6b;
+    --muted: #9aa8b2;
+  }
+  /* reset */
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:'Poppins',sans-serif;background:
+    radial-gradient(circle at 10% 10%, #071025, #010308 40%);color:#e6f7ff;}
+
+
+  /* top-right controls (timer + buttons) */
+  .top-controls {
+    position: fixed;
+    top: 20px;
+    right: 28px;
+    display:flex;
+    gap:12px;
+    align-items:center;
+    z-index:50;
+  }
+  .timer-bubble{
+    min-width:56px;height:56px;border-radius:12px;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:22px;color:var(--neon-cyan);
+    background:rgba(0,0,0,0.45);
+    box-shadow:0 8px 36px rgba(0,240,255,0.14), 0 0 28px rgba(255,0,208,0.06);
+    border:2px solid rgba(0,240,255,0.08);
+  }
+  .btn-neon{
+    padding:10px 18px;border-radius:14px;border:none;cursor:pointer;
+    font-weight:800;background:linear-gradient(90deg,var(--neon-magenta),var(--neon-cyan));
+    color:#012; box-shadow:0 8px 28px rgba(0,240,255,0.12);
+  }
+  .btn-ghost{
+    padding:10px 16px;border-radius:14px;border:1px solid rgba(255,255,255,0.04);
+    background:rgba(0,0,0,0.28);color:var(--muted);cursor:pointer;font-weight:700;
+  }
+
+
+  /* container with left scoreboard + center question */
+  .container{
+    max-width:1200px;margin:90px auto 60px;display:grid;
+    grid-template-columns:320px 1fr;gap:32px;align-items:start;padding:0 18px;
+  }
+
+
+  /* left panel (placar) */
+  .score-panel{
+    background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));
+    padding:22px;border-radius:14px;min-height:360px;border:1px solid rgba(255,255,255,0.02);
+    box-shadow:0 0 36px rgba(255,0,208,0.08);
+  }
+  .score-title{display:flex;align-items:center;gap:10px;font-weight:800;color:var(--neon-cyan);font-size:20px}
+  .score-list{margin-top:14px}
+  .score-item{padding:12px 10px;border-radius:10px;background:rgba(0,0,0,0.25);
+    margin-bottom:10px;border:1px solid rgba(255,255,255,0.02)}
+  .score-item h4{margin:0;color:var(--neon-green);font-size:16px}
+  .score-item small{color:var(--muted)}
+
+
+  .next-btn{
+    margin-top:16px;width:100%;padding:12px;border-radius:10px;border:none;background:rgba(0,0,0,0.22);
+    color:var(--muted);font-weight:800;cursor:pointer;
+  }
+
+
+  /* main question area */
+  .stage{
+    display:flex;flex-direction:column;gap:16px;
+  }
+  .question-panel{
+    background: rgba(0,0,0,0.18);
+    padding:22px;border-radius:14px;border:2px solid rgba(255,0,208,0.06);
+    box-shadow: 0 0 36px rgba(255,0,208,0.08);
+    min-height:120px; display:flex;align-items:center;justify-content:center;
+  }
+  .question-text{font-size:22px;color:var(--neon-magenta);font-weight:800;text-align:center;text-shadow:0 0 18px rgba(255,0,208,0.14)}
+
+
+  .alternatives{
+    display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px;
+  }
+  .alt{
+    background:rgba(0,0,0,0.24);padding:18px;border-radius:12px;border:3px solid rgba(0,240,255,0.12);
+    font-weight:800;color:var(--neon-cyan);cursor:pointer;text-align:center;font-size:16px;
+    box-shadow:0 12px 34px rgba(0,240,255,0.06);
+  }
+  .alt.disabled{opacity:0.45;pointer-events:none}
+  .alt.correct{outline:6px solid rgba(0,240,255,0.14)}
+  .alt.wrong{outline:6px solid rgba(255,0,208,0.12)}
+
+
+  /* small info row (round / group) */
+  .info-row{display:flex;justify-content:space-between;color:var(--muted);font-size:13px;margin-top:10px}
+
+
+  /* footer-ish instructions */
+  .instructions{color:var(--muted);font-size:13px;margin-top:8px;max-width:780px}
+
+
+  /* hidden helper */
+  .hidden{display:none}
+
+
+  @media(max-width:900px){
+    .container{grid-template-columns:1fr; padding:12px}
+    .score-panel{order:2}
+    .stage{order:1}
+    .top-controls{right:12px}
+  }
+</style>
+</head>
+<body>
+  <!-- TOP CONTROLS -->
+  <div class="top-controls">
+    <div id="timerBubble" class="timer-bubble">30</div>
+    <button id="startBtn" class="btn-neon">Iniciar Jogo</button>
+    <button id="viewScoreBtn" class="btn-ghost hidden">Ver Placar</button>
+  </div>
+
+
+  <!-- MAIN LAYOUT -->
+  <div class="container">
+    <!-- left: placar -->
+    <div class="score-panel" id="leftScore">
+      <div class="score-title">🏆 <span style="color:var(--neon-cyan)">Placar</span></div>
+
+
+      <div class="score-list" id="scoreList">
+        <div class="score-item"><h4>Grupo 1</h4><small id="pts_0">0 pts</small></div>
+        <div class="score-item"><h4>Grupo 2</h4><small id="pts_1">0 pts</small></div>
+        <div class="score-item"><h4>Grupo 3</h4><small id="pts_2">0 pts</small></div>
+        <div class="score-item"><h4>Grupo 4</h4><small id="pts_3">0 pts</small></div>
+      </div>
+
+
+      <button id="nextBtn" class="next-btn">Próxima (Professor)</button>
+      <button id="startBonusBtn" class="next-btn hidden" style="background:linear-gradient(90deg,var(--neon-magenta),var(--neon-cyan));color:#012;margin-top:10px">Iniciar Bônus</button>
+    </div>
+
+
+    <!-- center: pergunta + alternativas -->
+    <div class="stage">
+      <div class="question-panel">
+        <div id="questionText" class="question-text">Aqui fica a pergunta</div>
+      </div>
+
+
+      <div class="alternatives" id="alternatives">
+        <div class="alt" id="altA">A</div>
+        <div class="alt" id="altB">B</div>
+        <div class="alt" id="altC">C</div>
+        <div class="alt" id="altD">D</div>
+      </div>
+
+
+      <div class="info-row">
+        <div id="roundInfo">Rodada: 0 / 20</div>
+        <div id="groupInfo">Pergunta (Grupo): 0 / 4</div>
+      </div>
+
+
+      <div class="instructions">
+        <strong>Instruções:</strong> O grupo da vez tem 50s para responder. Se errar ou não responder, os outros grupos podem tentar roubar (via prompt) em ordem fixa. Se roubar e acertar, ganha +10 e o grupo original perde 10 (não fica negativo). Ao final das 80 perguntas aparece o botão <em>Iniciar Bônus</em> para aplicar as 5 perguntas de bônus (20 pts cada) para os 2 primeiros.
+      </div>
+    </div>
+  </div>
+
+
+<script>
+/* ===============================
+   CONFIGURAÇÕES E BASE DE DADOS
+   =============================== */
+const NUM_GRUPOS = 4;
+const POR_GRUPO = 20;        // 20 perguntas por grupo
+const TEMPO_POR_PERGUNTA = 50;
+const PONTOS_POR_ACERTO = 10;
+const PONTOS_BONUS = 20;
+
+
+const nomes = ["Grupo 1","Grupo 2","Grupo 3","Grupo 4"];
+
+
+/* ===============================
+   Base de perguntas (4 x 20 = 80)
+   Formato compatível com seu script:
+   perguntas = [ [grupo1], [grupo2], [grupo3], [grupo4] ]
+   Cada item: { texto, alternativas: {A,B,C,D}, correta: 'A'|'B'|'C'|'D' }
+   ============================== */
+const perguntas = [
+  // GRUPO 1 (1..20)
+  [
+    { texto: "1. Qual o único número primo par?", alternativas: {A:"2", B:"4", C:"0", D:"6"}, correta: "A" },
+    { texto: "2. Qual a área de um quadrado, sabendo que a medida do seu lado vale 5?", alternativas: {A:"30", B:"25", C:"10", D:"20"}, correta: "B" },
+    { texto: "3. O que faz um número ser primo?", alternativas: {A:"ser múltiplo de 2", B:"ser um número ímpar", C:"ser divisível por um e por ele mesmo", D:"ser um número par"}, correta: "C" },
+    { texto: "4. Qual o número que é o elemento neutro da soma?", alternativas: {A:"–1", B:"0", C:"1", D:"subtração"}, correta: "B" },
+    { texto: "5. Qual o número que é o elemento neutro da multiplicação?", alternativas: {A:"1", B:"–1", C:"0", D:"divisão"}, correta: "A" },
+    { texto: "6. Qual a raiz quadrada de 144?", alternativas: {A:"10", B:"22", C:"12", D:"14"}, correta: "C" },
+    { texto: "7. O que é o perímetro de uma figura plana?", alternativas: {A:"a soma de todos os lados da figura", B:"a multiplicação de todos os lados da figura", C:"área", D:"medida do lado"}, correta: "A" },
+    { texto: "8. O sinal de fração também corresponde a qual operação?", alternativas: {A:"multiplicação", B:"radiciação", C:"potência", D:"divisão"}, correta: "D" },
+    { texto: "9. Quanto é meia dúzia menos 9?", alternativas: {A:"15", B:"–3", C:"3", D:"21"}, correta: "B" },
+    { texto: "10. Qual a área de um triângulo que possui 5cm de altura e 8cm de base?", alternativas: {A:"40", B:"13", C:"20", D:"22"}, correta: "C" },
+    { texto: "11. Qual a fórmula de cálculo de área de um triângulo?", alternativas: {A:"(base vezes altura) divididos por 2", B:"base vezes altura", C:"(base + altura) divididos por 2", D:"(base – altura) divididos por 2"}, correta: "A" },
+    { texto: "12. Qual a fórmula de cálculo de área de um retângulo?", alternativas: {A:"4 vezes lado", B:"base vezes altura", C:"base mais altura", D:"2 vezes base + 2 vezes altura"}, correta: "B" },
+    { texto: "13. Qual a fórmula de cálculo de volume de um cubo?", alternativas: {A:"lado vezes lado", B:"4 vezes lado", C:"lado elevado a 3", D:"lado elevado a 2"}, correta: "C" },
+    { texto: "14. Qual a fórmula de cálculo de volume de uma pirâmide?", alternativas: {A:"(base + altura) divididos por 3", B:"(base vezes altura) divididos por 3", C:"(base + altura) divididos por 2", D:"(base vezes altura) dividido por 2"}, correta: "B" },
+    { texto: "15. Quanto é a raiz quadrada de 64 multiplicada por 5?", alternativas: {A:"40", B:"69", C:"30", D:"35"}, correta: "A" },
+    { texto: "16. Qual é a operação inversa da potência de 2?", alternativas: {A:"exponencial", B:"raiz quadrada", C:"multiplicação", D:"divisão"}, correta: "B" },
+    { texto: "17. Quando temos uma potência de mesma base se multiplicando o que fazemos com os expoentes?", alternativas: {A:"multiplicamos", B:"dividimos", C:"somamos", D:"subtraímos"}, correta: "C" },
+    { texto: "18. Quando temos uma potência de mesma base se dividindo o que fazemos com os expoentes?", alternativas: {A:"multiplicamos", B:"dividimos", C:"somamos", D:"subtraímos"}, correta: "D" },
+    { texto: "19. Uma equação possui as seguintes operações (multiplicação, adição, divisão, potência, subtração), qual a ordem que deve ser realizada as operações?", alternativas: {A:"multiplicação ou divisão, potência, adição ou subtração", B:"adição ou subtração, multiplicação ou divisão, potência", C:"potência, multiplicação ou divisão, adição ou subtração", D:"multiplicação, adição, divisão, subtração"}, correta: "C" },
+    { texto: "20. Quando calculamos quanto de água vai em uma piscina, estamos calculando?", alternativas: {A:"área", B:"líquido", C:"volume", D:"metros ao quadrado"}, correta: "C" }
+  ],
+
+  // GRUPO 2 (1..20, corresponde às suas questões 16..35 renumeradas)
+  [
+    { texto: "1. Qual a fórmula de cálculo de área de uma circunferência?", alternativas: {A:"pi vezes (raio ao quadrado)", B:"raio vezes altura", C:"pi + raio ao quadrado", D:"2 vezes pi vezes raio"}, correta: "A" },
+    { texto: "2. Qual a fórmula de cálculo de volume de um cilindro?", alternativas: {A:"(2 vezes pi vezes raio) divididos por 2", B:"raio vezes altura", C:"pi vezes (raio ao quadrado) vezes altura", D:"raio ao quadrado"}, correta: "C" },
+    { texto: "3. Quando temos dois números com mesmo sinal e eles estão se multiplicando o resultado será?", alternativas: {A:"negativo", B:"positivo", C:"sinal do maior número da operação", D:"sinal do menor número da operação"}, correta: "B" },
+    { texto: "4. Qual é a operação inversa da adição?", alternativas: {A:"multiplicação", B:"soma", C:"potenciação", D:"subtração"}, correta: "D" },
+    { texto: "5. Qual é a operação inversa da multiplicação?", alternativas: {A:"divisão", B:"adição", C:"potenciação", D:"subtração"}, correta: "A" },
+    { texto: "6. Qual é a operação inversa da raiz quadrada?", alternativas: {A:"divisão por 2", B:"potência de 2", C:"radiciação de 2", D:"fatoração de 2"}, correta: "B" },
+    { texto: "7. Qual é a operação inversa da subtração?", alternativas: {A:"divisão", B:"adição", C:"multiplicação", D:"radiciação"}, correta: "B" },
+    { texto: "8. Qual é a operação inversa da divisão?", alternativas: {A:"divisão", B:"adição", C:"multiplicação", D:"radiciação"}, correta: "C" },
+    { texto: "9. Na multiplicação e divisão + com - é?", alternativas: {A:"–", B:"+", C:"depende do sinal do maior número", D:"depende do sinal do menor número"}, correta: "A" },
+    { texto: "10. Na multiplicação e divisão - com - é?", alternativas: {A:"–", B:"+", C:"depende do sinal do maior número", D:"depende do sinal do menor número"}, correta: "B" },
+    { texto: "11. Como que calcula divisão de frações?", alternativas: {A:"divide fração por fração", B:"multiplica as frações", C:"repete a primeira e multiplica com o inverso da segunda", D:"os denominadores precisam ser iguais"}, correta: "C" },
+    { texto: "12. Como que calcula multiplicação de frações?", alternativas: {A:"multiplica numerador com numerador, e denominador com denominador", B:"soma os numeradores e divide pelos denominadores", C:"subtrai os denominadores e soma os numeradores", D:"fatoração"}, correta: "A" },
+    { texto: "13. O custo de uma passagem de transfer é de R$: 25,00 taxa fixa, mais R$: 3,50 por quilômetro rodado até o destino. Qual a função representa o custo da passagem?", alternativas: {A:"P(x) = 3,50 + 25", B:"P(x) = 25x + 3,50", C:"P(x) = 3,50x + 25", D:"P(x) = 25 – 35x"}, correta: "C" },
+    { texto: "14. Quanto vale π (pi) com duas casas decimais?", alternativas: {A:"3,15", B:"4,14", C:"3,44", D:"3,14"}, correta: "D" },
+    { texto: "15. Quanto é o cálculo da raiz quadrada de 225 dividida por 3?", alternativas: {A:"5", B:"7", C:"15", D:"25"}, correta: "A" },
+    { texto: "16. Quanto é o cálculo da raiz quadrada de 121?", alternativas: {A:"9", B:"11", C:"21", D:"17"}, correta: "B" },
+    { texto: "17. Quanto é o cálculo da raiz quadrada de 169 multiplicado por 2?", alternativas: {A:"38", B:"28", C:"26", D:"36"}, correta: "C" },
+    { texto: "18. Quanto é a área de um retângulo de comprimento medindo 12cm, e largura medindo 4cm?", alternativas: {A:"32", B:"48", C:"36", D:"16"}, correta: "B" },
+    { texto: "19. Qual é o nome da linha que divide uma circunferência ao meio?", alternativas: {A:"reta", B:"comprimento", C:"área", D:"diâmetro"}, correta: "D" },
+    { texto: "20. Qual é o resultado de 25% de 80?", alternativas: {A:"40", B:"20", C:"25", D:"30"}, correta: "B" }
+  ],
+
+  // GRUPO 3 (renumeradas 1..20 a partir das suas 28..47)
+  [
+    { texto: "1. Ao somar um número positivo com um negativo, devo subtrair ou somar os seus valores? E qual sinal o resultado terá?", alternativas: {A:"somar, sinal positivo", B:"subtrair, sinal negativo", C:"somar, sinal do maior número", D:"subtrair, sinal do maior número"}, correta: "D" },
+    { texto: "2. Todo número elevado ao expoente 1 resulta em?", alternativas: {A:"mesmo número", B:"1", C:"0", D:"–1"}, correta: "A" },
+    { texto: "3. Todo número elevado ao expoente 0 resulta em?", alternativas: {A:"0", B:"1", C:"–1", D:"não existe"}, correta: "B" },
+    { texto: "4. Qual o nome do conjunto numérico que possui apenas os números positivos?", alternativas: {A:"inteiros", B:"racionais", C:"naturais", D:"reais"}, correta: "C" },
+    { texto: "5. Quando não temos um sinal aparente entre número e letra, qual operação há entre eles? (Ex: 4x)", alternativas: {A:"não tem operação", B:"divisão", C:"multiplicação", D:"adição"}, correta: "C" },
+    { texto: "6. Qual é a fórmula do Teorema de Pitágoras?", alternativas: {A:"a soma dos quadrados dos catetos é igual a hipotenusa ao quadrado", B:"a subtração dos catetos é igual a hipotenusa", C:"a multiplicação dos catetos ao quadrado é igual a hipotenusa ao quadrado", D:"a divisão dos catetos é igual a hipotenusa ao quadrado"}, correta: "A" },
+    { texto: "7. Qual a fórmula do seno?", alternativas: {A:"cateto adjacente vezes hipotenusa", B:"cateto oposto divididos pela hipotenusa", C:"cateto adjacente divididos pela hipotenusa", D:"cateto oposto vezes hipotenusa"}, correta: "B" },
+    { texto: "8. Qual a fórmula do cosseno?", alternativas: {A:"cateto adjacente vezes hipotenusa", B:"cateto oposto divididos pela hipotenusa", C:"cateto adjacente divididos pela hipotenusa", D:"cateto oposto vezes hipotenusa"}, correta: "C" },
+    { texto: "9. Qual a fórmula da tangente?", alternativas: {A:"cateto oposto divididos pelo cateto adjacente", B:"cateto oposto divididos pela hipotenusa", C:"cateto adjacente divididos pela hipotenusa", D:"cateto adjacente divididos pelo cateto oposto"}, correta: "A" },
+    { texto: "10. O que é a hipotenusa?", alternativas: {A:"menor lado de um triângulo retângulo", B:"maior lado de um retângulo", C:"menor lado de um retângulo", D:"maior lado de um triângulo retângulo"}, correta: "D" },
+    { texto: "11. O que é cateto oposto?", alternativas: {A:"lado oposta ao ângulo", B:"lado maior", C:"lado menor", D:"lado junto ao ângulo"}, correta: "A" },
+    { texto: "12. O que é cateto adjacente?", alternativas: {A:"lado oposta ao ângulo", B:"lado maior", C:"lado menor", D:"lado junto ao ângulo"}, correta: "D" },
+    { texto: "13. O que é o eixo das abscissas?", alternativas: {A:"eixo y", B:"eixo x", C:"eixo x maior que 0", D:"eixo y maior que 0"}, correta: "B" },
+    { texto: "14. Qual é a fórmula para calcular o perímetro de um triângulo?", alternativas: {A:"2 vezes medida do lado", B:"(base vezes altura) divididos por 2", C:"a soma da medida dos 3 lados", D:"preciso saber se o triângulo é retângulo"}, correta: "C" },
+    { texto: "15. 1000 litros equivale a quantos metros cúbicos?", alternativas: {A:"1 metro cúbico", B:"10 metros cúbicos", C:"100 metros cúbicos", D:"0,1 metros cúbicos"}, correta: "A" },
+    { texto: "16. Um triângulo tem seus catetos medindo 4cm e 3cm respectivamente, qual a medida da sua hipotenusa?", alternativas: {A:"12", B:"14", C:"25", D:"5"}, correta: "D" },
+    { texto: "17. Qual é a forma padrão de uma equação do 2° grau?", alternativas: {A:"f(x)= ax + b", B:"f(x) = ax² + bx + c", C:"f(x) = x + y", D:"f(x) = 3x + 9"}, correta: "B" },
+    { texto: "18. Qual é a forma padrão de uma equação do 1° grau?", alternativas: {A:"f(x)= ax + b", B:"f(x) = ax² + bx + c", C:"f(x) = x + y", D:"f(x) = 3 + 5"}, correta: "A" },
+    { texto: "19. Quando o coeficiente ‘a’ da função de segundo grau f(x) = ax²+bx+c, é positivo, a parábola da função terá concavidade?", alternativas: {A:"para cima", B:"para baixo", C:"para esquerda", D:"para direita"}, correta: "A" },
+    { texto: "20. Quando o coeficiente ‘a’ da função de segundo grau f(x) = ax²+bx+c, é negativa, a parábola da função terá concavidade?", alternativas: {A:"para cima", B:"para baixo", C:"para esquerda", D:"para direita"}, correta: "B" }
+  ],
+
+  // GRUPO 4 (renumeradas 1..20 a partir das suas 52..70 + 80)
+  [
+    { texto: "1. O que é o eixo das ordenadas?", alternativas: {A:"eixo x", B:"eixo y", C:"eixo x positivo", D:"eixo y negativo"}, correta: "B" },
+    { texto: "2. Quais são os ângulos notáveis?", alternativas: {A:"0; 20; 30", B:"30; 45; 60", C:"0; 20; 90", D:"35; 45; 60"}, correta: "B" },
+    { texto: "3. Qual é a fórmula de cálculo do volume do prisma?", alternativas: {A:"lado ao quadrado vezes altura", B:"lado vezes largura vezes altura", C:"pi vezes raio ao quadrado vezes altura", D:"área da base vezes altura"}, correta: "D" },
+    { texto: "4. O que é um vértice?", alternativas: {A:"quantidade de arestas de um polígono", B:"superfície plana de um polígono", C:"retas de um polígono", D:"ponto onde duas ou mais retas se encontram em um polígono"}, correta: "D" },
+    { texto: "5. O que é uma aresta?", alternativas: {A:"quantidade de arestas de um polígono", B:"superfície plana de um polígono", C:"retas de um polígono", D:"ponto onde duas ou mais retas se encontram em um polígono"}, correta: "C" },
+    { texto: "6. O que é uma face?", alternativas: {A:"quantidade de arestas de um polígono", B:"superfície plana de um polígono", C:"retas de um polígono", D:"ponto onde duas ou mais retas se encontram em um polígono"}, correta: "B" },
+    { texto: "7. Quanto é log(10)?", alternativas: {A:"1", B:"0", C:"10", D:"2"}, correta: "A" },
+    { texto: "8. Qual o ângulo formado por uma circunferência completa?", alternativas: {A:"90", B:"360", C:"180", D:"270"}, correta: "B" },
+    { texto: "9. Qual o ângulo formado por uma meia circunferência?", alternativas: {A:"90", B:"360", C:"180", D:"270"}, correta: "C" },
+    { texto: "10. Qual o ângulo formado por um quarto de circunferência?", alternativas: {A:"90", B:"360", C:"180", D:"270"}, correta: "A" },
+    { texto: "11. O que determina um triângulo ser triângulo retângulo?", alternativas: {A:"dois de seus ângulos internos precisa ter 60 graus", B:"um lado precisa medir 5", C:"um dos seus ângulos internos precisa ser 90 graus", D:"precisa ter 3 lados"}, correta: "C" },
+    { texto: "12. Nome da forma geométrica que possui três lados?", alternativas: {A:"quadrado", B:"tetraedro", C:"pirâmide", D:"triângulo"}, correta: "D" },
+    { texto: "13. Qual o ângulo formado por três quartos de uma circunferência?", alternativas: {A:"90", B:"360", C:"180", D:"270"}, correta: "D" },
+    { texto: "14. Qual é o valor de x na equação 3x + 5 = 20?", alternativas: {A:"5", B:"15", C:"20", D:"8"}, correta: "A" },
+    { texto: "15. Sabendo que a área de um quadrado é igual a 289, quanto vale seu lado?", alternativas: {A:"23", B:"13", C:"17", D:"27"}, correta: "C" },
+    { texto: "16. O custo de fabricação de uma camiseta é de R$: 15,00 taxa fixa, mais R$: 10,80 por arte de serigrafia colocada. Qual a função representa o custo da camiseta?", alternativas: {A:"C(x) = 15x + 10,80", B:"C(x) = 15x - 10,80", C:"C(x) = 10,80x + 15", D:"C(x) = 10x + 15"}, correta: "C" },
+    { texto: "17. Sabendo que um triângulo tem 6 de altura e 3 de base, qual é a sua área?", alternativas: {A:"3", B:"9", C:"18", D:"12"}, correta: "B" },
+    { texto: "18. O custo de um serviço é de R$:10,00 taxa fixa, mais R$: 5,00 por hora trabalhada. Qual a função representa esse custo de serviço?", alternativas: {A:"S(x) = 5x + 10", B:"S(x) = 5x - 10", C:"S(x) = 10x + 5", D:"S(x) = 5x"}, correta: "A" },
+    { texto: "19. O custo de uma corrida de taxi é de R$: 5,00 taxa fixa, mais R$: 2,50 por quilômetro rodado até o destino. Qual a função representa o custo da corrida?", alternativas: {A:"C(x) = 5x + 2", B:"C(x) = 5x - 2,50", C:"C(x) = 2,50x + 5", D:"C(x) = 2,50x - 2"}, correta: "C" },
+    { texto: "20. Quanto é log (100)?", alternativas: {A:"2", B:"1", C:"0,1", D:"0,2"}, correta: "A" }
+  ]
+];
+
+/* perguntas bônus (5 q) */
+const perguntasBonus = [
+  { texto: "BÔNUS 1: Se a sequência é 2, 4, 8, 16, qual é o próximo número?", alternativas: {A:"32", B:"18", C:"22", D:"28"}, correta: "A" },
+  { texto: "BÔNUS 2: João é mais alto que Pedro. Pedro é mais alto que Lucas. Logo, podemos afirmar que:", alternativas: {A:"João é o mais baixo.", B:"Lucas é mais alto que João.", C:"João e Lucas têm a mesma altura.", D:"João é mais alto que Lucas."}, correta: "D" },
+  { texto: "BÔNUS 3: Quando a base do logaritmo não é especificada, quanto vale?", alternativas: {A:"1", B:"0", C:"não existe", D:"10"}, correta: "D" },
+  { texto: "BÔNUS 4: Se um quadrado tem área de 64 centímetros quadrados, qual é o perímetro desse quadrado?", alternativas: {A:"8", B:"12", C:"24", D:"32"}, correta: "D" },
+  { texto: "BÔNUS 5: Quanto é 4! ?", alternativas: {A:"8", B:"12", C:"24", D:"não existe"}, correta: "C" }
+];
+
+
+
+/* ==============================
+   Estado do jogo e elementos DOM
+   ============================== */
+let pontos = [0,0,0,0];
+let rodada = 0;   // 0..POR_GRUPO-1
+let etapa = 0;    // 0..NUM_GRUPOS-1 (grupo da vez)
+let timerRef = null;
+let tempoRestante = TEMPO_POR_PERGUNTA;
+let aguardandoResposta = false;
+
+
+const timerBubble = document.getElementById('timerBubble');
+const startBtn = document.getElementById('startBtn');
+const viewScoreBtn = document.getElementById('viewScoreBtn');
+const nextBtn = document.getElementById('nextBtn');
+const startBonusBtn = document.getElementById('startBonusBtn');
+
+
+const questionText = document.getElementById('questionText');
+const alternativesDiv = document.getElementById('alternatives');
+const altA = document.getElementById('altA');
+const altB = document.getElementById('altB');
+const altC = document.getElementById('altC');
+const altD = document.getElementById('altD');
+
+
+const roundInfo = document.getElementById('roundInfo');
+const groupInfo = document.getElementById('groupInfo');
+
+
+const ptsEls = [
+  document.getElementById('pts_0'),
+  document.getElementById('pts_1'),
+  document.getElementById('pts_2'),
+  document.getElementById('pts_3')
+];
+
+
+const altButtons = { A: altA, B: altB, C: altC, D: altD };
+
+
+/* validação */
+if (perguntas.length !== NUM_GRUPOS) {
+  alert("Erro: número de grupos incorreto.");
+}
+for (let i=0;i<NUM_GRUPOS;i++){
+  if (!perguntas[i] || perguntas[i].length !== POR_GRUPO) {
+    alert(`Erro: Grupo ${i+1} deve ter ${POR_GRUPO} perguntas. Atualmente tem ${perguntas[i]?.length || 0}.`);
+  }
+}
+
+
+/* ==============================
+   Funções de UI / lógica
+   ============================== */
+
+
+function atualizarPlacarUI(){
+  for (let i=0;i<NUM_GRUPOS;i++){
+    ptsEls[i].textContent = `${pontos[i]} pts`;
+  }
+}
+
+
+/* Apresenta pergunta do grupo g e rodada r */
+function exibirPergunta(g,r){
+  const q = perguntas[g][r];
+  questionText.textContent = q.texto;
+  altA.textContent = `A — ${q.alternativas.A}`;
+  altB.textContent = `B — ${q.alternativas.B}`;
+  altC.textContent = `C — ${q.alternativas.C}`;
+  altD.textContent = `D — ${q.alternativas.D}`;
+  // limpar classes
+  Object.values(altButtons).forEach(el => { el.classList.remove('disabled','correct','wrong'); });
+  roundInfo.textContent = `Rodada: ${r+1} / ${POR_GRUPO}`;
+  groupInfo.textContent = `Pergunta (Grupo): ${g+1} / ${NUM_GRUPOS}`;
+  habilitarAlternativas(true);
+  // start small glow on timer
+  timerBubble.style.boxShadow = "0 8px 36px rgba(0,240,255,0.14)";
+}
+
+
+/* habilitar alternativas */
+function habilitarAlternativas(flag){
+  aguardandoResposta = flag;
+  Object.values(altButtons).forEach(el => {
+    if (flag) el.classList.remove('disabled');
+    else el.classList.add('disabled');
+  });
+}
+
+
+/* start timer */
+function startTimer(g,r){
+  clearInterval(timerRef);
+  tempoRestante = TEMPO_POR_PERGUNTA;
+  timerBubble.textContent = tempoRestante;
+  timerRef = setInterval(()=> {
+    tempoRestante--;
+    timerBubble.textContent = tempoRestante;
+    if (tempoRestante <= 6 && tempoRestante > 0) {
+      // small visual ping
+      timerBubble.style.transform = "scale(1.06)";
+      setTimeout(()=> timerBubble.style.transform = "", 120);
+    }
+    if (tempoRestante <= 0) {
+      clearInterval(timerRef); timerRef = null;
+      timerBubble.style.boxShadow = "0 8px 18px rgba(0,240,255,0.06)";
+      habilitarAlternativas(false);
+      processarTimeout(g,r);
+    }
+  },1000);
+}
+
+
+/* Ao usuário clicar em alternativa */
+function responder(letra){
+  if (!aguardandoResposta) return;
+  habilitarAlternativas(false);
+  clearInterval(timerRef); timerRef = null;
+  timerBubble.style.boxShadow = "0 8px 18px rgba(0,240,255,0.06)";
+
+
+  const q = perguntas[etapa][rodada];
+  if (letra === q.correta.toUpperCase()) {
+    // acerto
+    pontos[etapa] += PONTOS_POR_ACERTO;
+    atualizarPlacarUI();
+    altButtons[letra].classList.add('correct');
+    showTempMessage(`${nomes[etapa]} acertou! +${PONTOS_POR_ACERTO} pts`, true);
+    // auto-advance after short delay
+    setTimeout(()=> advanceAfterAnswer(true), 900);
+  } else {
+    // erro: marca vermelho e iniciar roubo
+    altButtons[letra].classList.add('wrong');
+    showTempMessage(`${nomes[etapa]} errou! Resposta: ${q.correta} — ${q.alternativas[q.correta]}`, false);
+    setTimeout(()=> iniciarRoubo(etapa, rodada), 700);
+  }
+}
+
+
+/* processar timeout */
+function processarTimeout(g,r){
+  const q = perguntas[g][r];
+  showTempMessage(`${nomes[g]} não respondeu a tempo. Resposta: ${q.correta} — ${q.alternativas[q.correta]}`, false);
+  setTimeout(()=> iniciarRoubo(g,r), 700);
+}
+
+
+/* mostra mensagem temporária substituindo a pergunta por 1.4s */
+function showTempMessage(msg, positive){
+  const old = questionText.textContent;
+  questionText.textContent = msg;
+  // pequena cor: green or magenta
+  if (positive) questionText.style.color = "var(--neon-cyan)";
+  else questionText.style.color = "var(--neon-magenta)";
+  setTimeout(()=> {
+    // se jogo ainda ativo e ainda há pergunta, restaurar texto da pergunta atual
+    if (rodada < POR_GRUPO && perguntas[etapa] && perguntas[etapa][rodada]) {
+      questionText.textContent = perguntas[etapa][rodada].texto;
+      questionText.style.color = "var(--neon-magenta)";
+    } else {
+      questionText.textContent = old;
+      questionText.style.color = "var(--neon-magenta)";
+    }
+  },1400);
+}
+
+
+/* iniciar roubo em ordem fixa */
+function iniciarRoubo(g,r){
+  const q = perguntas[g][r];
+  let alguemAcertou = false;
+  // percorre os outros grupos em ordem fixa
+  for (let i=1;i<NUM_GRUPOS;i++){
+    const candidato = (g + i) % NUM_GRUPOS;
+    const quer = confirm(`${nomes[candidato]}, desejam tentar roubar? (OK = Sim / Cancel = Não)`);
+    if (!quer) continue;
+    let resp = prompt(`${nomes[candidato]} — digite a letra da resposta (A/B/C/D):`) || "";
+    resp = resp.trim().toUpperCase();
+    if (!["A","B","C","D"].includes(resp)) { alert("Resposta inválida ou vazia — considerado erro."); continue; }
+    if (resp === q.correta.toUpperCase()) {
+      // acertou no roubo
+      pontos[candidato] += PONTOS_POR_ACERTO;
+      pontos[g] = Math.max(0, pontos[g] - PONTOS_POR_ACERTO);
+      atualizarPlacarUI();
+      alert(`${nomes[candidato]} acertou e roubou ${PONTOS_POR_ACERTO} pts de ${nomes[g]}!`);
+      alguemAcertou = true;
+      break;
+    } else {
+      alert(`${nomes[candidato]} errou no roubo.`);
+    }
+  }
+  if (!alguemAcertou) {
+    alert("Ninguém acertou (ou quis tentar). Sem pontos atribuídos.");
+  }
+  // depois do roubo, professor deve avançar manualmente (ou clicará Próxima)
+}
+
+
+/* avanço automático após acerto: */
+function advanceAfterAnswer(wasCorrect){
+  etapa++;
+  if (etapa >= NUM_GRUPOS){ etapa = 0; rodada++; }
+  if (rodada >= POR_GRUPO) {
+    // terminou as 80 perguntas
+    finishNormalPhase();
+    return;
+  }
+  exibirPergunta(etapa, rodada);
+  startTimer(etapa, rodada);
+}
+
+
+/* Próxima (botão professor) */
+function proximaPergunta(){
+  if (aguardandoResposta) {
+    if (!confirm("A pergunta ainda está ativa. Deseja avançar e considerar como sem resposta?")) return;
+    clearInterval(timerRef); timerRef = null;
+    processarTimeout(etapa, rodada);
+    return;
+  }
+  etapa++;
+  if (etapa >= NUM_GRUPOS){ etapa = 0; rodada++; }
+  if (rodada >= POR_GRUPO){
+    finishNormalPhase();
+    return;
+  }
+  exibirPergunta(etapa, rodada);
+  startTimer(etapa, rodada);
+}
+
+
+/* inicia o jogo */
+function iniciarJogo(){
+  // reset geral
+  pontos = [0,0,0,0];
+  rodada = 0; etapa = 0;
+  atualizarPlacarUI();
+  // atualiza UI
+  viewScoreBtn.classList.add('hidden'); startBonusBtn.classList.add('hidden');
+  // exibir primeira pergunta (grupo 0, rodada 0)
+  exibirPergunta(etapa, rodada);
+  startTimer(etapa, rodada);
+}
+
+
+/* quando as 80 perguntas terminam */
+function finishNormalPhase(){
+  clearInterval(timerRef); timerRef = null;
+  habilitarAlternativas(false);
+  // mostrar botão Iniciar Bônus
+  startBonusBtn.classList.remove('hidden');
+  showTempMessage("Fase normal concluída. Clique em Iniciar Bônus quando desejar.", false);
+}
+
+
+/* iniciar fase bônus (top2) */
+function iniciarBonus(){
+  startBonusBtn.classList.add('hidden');
+  // ordenar por pontos
+  const ranking = nomes.map((n,i)=>({nome:n, pts:pontos[i], idx:i})).sort((a,b)=>b.pts - a.pts);
+  const top1 = ranking[0].idx;
+  const top2 = ranking[1].idx;
+  if (!confirm(`Fase Bônus: os dois melhores são ${ranking[0].nome} e ${ranking[1].nome}. Iniciar?`)) {
+    finalizarJogo();
+    return;
+  }
+  // executar as 5 perguntas bonus, alternando entre os dois
+  for (let i=0;i<perguntasBonus.length;i++){
+    const grupoAtual = (i % 2 === 0) ? top1 : top2;
+    const q = perguntasBonus[i];
+    questionText.textContent = q.texto;
+    altA.textContent = `A — ${q.alternativas.A}`;
+    altB.textContent = `B — ${q.alternativas.B}`;
+    altC.textContent = `C — ${q.alternativas.C}`;
+    altD.textContent = `D — ${q.alternativas.D}`;
+    Object.values(altButtons).forEach(el => el.classList.add('disabled'));
+    const resp = prompt(`${nomes[grupoAtual]} — BÔNUS ${i+1}: digite a letra da resposta (A/B/C/D):`) || "";
+    const r = resp.trim().toUpperCase();
+    if (r === q.correta.toUpperCase()) {
+      pontos[grupoAtual] += PONTOS_BONUS;
+      alert(`${nomes[grupoAtual]} acertou! +${PONTOS_BONUS} pts`);
+    } else {
+      alert(`${nomes[grupoAtual]} errou. Resposta correta: ${q.correta} — ${q.alternativas[q.correta]}`);
+    }
+    atualizarPlacarUI();
+  }
+  finalizarJogo();
+}
+
+
+/* finalizar jogo: mostra placar final e botão ver placar */
+function finalizarJogo(){
+  clearInterval(timerRef); timerRef = null;
+  habilitarAlternativas(false);
+  // mostrar botão Ver Placar
+  viewScoreBtn.classList.remove('hidden');
+  // atualização final do placar (já feita)
+  // mostra classificação
+  const resultado = nomes.map((n,i)=>({nome:n, pts:pontos[i]})).sort((a,b)=>b.pts - a.pts);
+  let msg = "Jogo finalizado! Classificação:\n\n";
+  resultado.forEach((r,idx)=> {
+    let medalha = "";
+    if (idx===0) medalha="🥇";
+    if (idx===1) medalha="🥈";
+    if (idx===2) medalha="🥉";
+    msg += `${idx+1}º - ${r.nome}: ${r.pts} pts ${medalha}\n`;
+  });
+  alert(msg);
+}
+
+
+/* botão ver placar (abre alerta) */
+function verPlacar(){
+  let s = "Placar atual:\n";
+  for (let i=0;i<NUM_GRUPOS;i++) s += `${nomes[i]}: ${pontos[i]} pts\n`;
+  alert(s);
+}
+
+
+/* event wiring */
+startBtn.addEventListener('click', iniciarJogo);
+viewScoreBtn.addEventListener('click', verPlacar);
+nextBtn.addEventListener('click', proximaPergunta);
+startBonusBtn.addEventListener('click', iniciarBonus);
+
+
+/* map clicks for alternatives */
+altA.addEventListener('click', ()=> responder('A'));
+altB.addEventListener('click', ()=> responder('B'));
+altC.addEventListener('click', ()=> responder('C'));
+altD.addEventListener('click', ()=> responder('D'));
+
+
+/* evitar timer ativo ao fechar */
+window.addEventListener('beforeunload', ()=> clearInterval(timerRef));
+
+
+/* inicial UI */
+atualizarPlacarUI();
+questionText.textContent = "Pressione 'Iniciar Jogo' para começar.";
+Object.values(altButtons).forEach(el => el.classList.add('disabled'));
+timerBubble.textContent = TEMPO_POR_PERGUNTA;
+
+
+</script>
+</body>
+</html>
